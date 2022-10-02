@@ -1,0 +1,62 @@
+import io
+import itertools
+import pandas as pd
+import os
+pd.set_option('display.max_rows', None)
+
+directory = os.getcwd()
+
+def string_in_string(substrings, strings, case = False):
+    '''
+    function to find substrings within a string
+    '''
+    substrings_l = substrings
+    strings_l = strings
+    
+    if case == True: # make all lower case to ensure all values are found
+        strings_l = [x.lower() for x in strings]
+        substrings_l = [x.lower() for x in substrings]
+    
+    l = [[i for j in substrings_l if j in strings_l[i]] for i in range(len(strings_l))]
+    index = list(itertools.chain(*l))
+    
+    ll = [strings[i] for i in index] # keep original values, whether upper or lower case
+    
+    return(ll,index)
+
+names = ['date','time'] # columns to query
+
+ddf = pd.DataFrame()
+
+n_row = 100
+
+for dirpath, _, filenames in os.walk(directory):
+    for filename in filenames:
+      os.chdir(dirpath)
+      if '.csv' in filename: # check for csv files
+          df = pd.read_csv(filename, nrows=0) # read in first row
+          cols = df.columns.tolist() # get column names
+          variable, ind = string_in_string(names,cols,True) # find columns which match query
+          if len(ind)>0: # if there are any matched columns read in row by row
+              i=1
+              df = pd.read_csv(filename, nrows = i, usecols = ind) # read in ith row
+              while any(df.iloc[0].isna()) and i<n_row: # read in data row by row until all are non-NA or i reaches the maximum iterations 
+                  i +=1
+                  df = pd.read_csv(filename, nrows = i,skiprows=range(1,i), usecols = ind)
+              ddf=pd.concat([ddf,df]) # add the complete row
+      if '.txt' in filename: # same as above for a txt file
+          df = pd.read_table(filename, nrows=0)
+          cols = df.columns.tolist()
+          variable, ind  = string_in_string(names,cols,True)
+          if len(ind)>0:
+              i=1
+              df = pd.read_table(filename, nrows = i, usecols = ind)
+              while any(df.iloc[0].isna()) and i<n_row:
+                  i +=1
+                  df = pd.read_table(filename, nrows = i,skiprows=range(1,i), usecols = ind)
+              ddf=pd.concat([ddf,df])
+
+
+                              
+
+ddf.apply(lambda x: pd.Series(x.dropna().values), axis=0).iloc[0].to_frame().sort_index() # store non-NA values and arrange columns alphabetically
